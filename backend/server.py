@@ -519,6 +519,28 @@ async def websocket_camera(websocket: WebSocket, camera_id: str):
 # Include router
 app.include_router(api_router)
 
+# Serve static files (React build)
+STATIC_DIR = ROOT_DIR.parent / 'frontend' / 'build'
+if STATIC_DIR.exists():
+    # Mount static files
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR / 'static')), name="static")
+    
+    # Serve index.html for all non-API routes (SPA routing)
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # Skip API routes
+        if full_path.startswith('api/'):
+            raise HTTPException(status_code=404, detail="Not found")
+        
+        # Serve index.html for all other routes
+        index_file = STATIC_DIR / 'index.html'
+        if index_file.exists():
+            return FileResponse(index_file)
+        else:
+            raise HTTPException(status_code=404, detail="Frontend not found")
+else:
+    logger.warning(f"Frontend build directory not found at {STATIC_DIR}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
