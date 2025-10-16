@@ -215,7 +215,7 @@ yarn start
 ## Требования
 
 - Python 3.11+
-- Node.js 18+
+- Node.js 20+ (требуется для React Router DOM 7.9)
 - MongoDB 7.0+
 - FFmpeg
 - OpenCV
