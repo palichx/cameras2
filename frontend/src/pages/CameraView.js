@@ -3,9 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { ArrowLeft, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import ZoneEditor from '../components/ZoneEditor';
+import MotionSettings from '../components/MotionSettings';
 import { getBackendUrl, getWebSocketUrl } from '../utils/api';
 
 const BACKEND_URL = getBackendUrl();
