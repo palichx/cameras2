@@ -16,6 +16,10 @@ node_modules/
 !.yarn/releases
 !.yarn/versions
 
+# Keep lock files for reproducible builds
+!yarn.lock
+!package-lock.json
+
 # Testing
 /coverage
 
