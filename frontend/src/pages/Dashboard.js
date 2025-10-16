@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge';
 import { Plus, Video, Trash2, Play, Square, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import { getBackendUrl } from '../utils/api';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = getBackendUrl();
 const API = `${BACKEND_URL}/api`;
 
 export default function Dashboard() {
