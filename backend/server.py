@@ -43,6 +43,13 @@ logger = logging.getLogger(__name__)
 class ExclusionZone(BaseModel):
     points: List[Tuple[int, int]]  # List of (x, y) coordinates
 
+class MotionSettings(BaseModel):
+    enabled: bool = True  # Запись при движении
+    sensitivity: int = 25  # Чувствительность MOG2 (1-100, меньше = более чувствительный)
+    min_area: int = 500  # Минимальная площадь движения в пикселях
+    pre_record: int = 5  # Секунды предзаписи
+    post_record: int = 10  # Секунды постзаписи
+
 class CameraCreate(BaseModel):
     name: str
     url: str  # rtsp://username:password@ip:port/path or http://...
@@ -62,6 +69,7 @@ class Camera(BaseModel):
     bitrate: Optional[str] = None
     fps: Optional[float] = None
     exclusion_zones: List[ExclusionZone] = []
+    motion_settings: MotionSettings = Field(default_factory=MotionSettings)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class Recording(BaseModel):
@@ -79,6 +87,7 @@ class Recording(BaseModel):
 class CameraUpdate(BaseModel):
     name: Optional[str] = None
     exclusion_zones: Optional[List[ExclusionZone]] = None
+    motion_settings: Optional[MotionSettings] = None
 
 # Camera Manager - Singleton for managing camera connections
 class CameraManager:
