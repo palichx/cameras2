@@ -305,18 +305,38 @@ ws_manager = ConnectionManager()
 
 # Background task for processing camera stream
 async def process_camera_stream(camera_id: str):
+    consecutive_failures = 0
+    max_failures = 10
+    
     while camera_id in camera_manager.active_cameras:
         try:
             cam_data = camera_manager.active_cameras[camera_id]
             cap = cam_data['cap']
             mog2 = cam_data['mog2']
             recording = cam_data['recording']
+            codec = cam_data.get('codec', 'unknown')
             
             # Read frame
             ret, frame = await asyncio.to_thread(cap.read)
             
-            if not ret:
-                logger.warning(f"Failed to read frame from camera {camera_id}")
+            if not ret or frame is None:
+                consecutive_failures += 1
+                logger.warning(f"Failed to read frame from camera {camera_id} (attempt {consecutive_failures}/{max_failures})")
+                
+                if consecutive_failures >= max_failures:
+                    logger.error(f"Too many consecutive failures for camera {camera_id}, stopping stream")
+                    await camera_manager.disconnect_camera(camera_id)
+                    break
+                
+                await asyncio.sleep(0.5)
+                continue
+            
+            # Reset failure counter on successful read
+            consecutive_failures = 0
+            
+            # Verify frame is not empty
+            if frame.size == 0:
+                logger.warning(f"Empty frame from camera {camera_id}")
                 await asyncio.sleep(0.1)
                 continue
             
@@ -346,8 +366,19 @@ async def process_camera_stream(camera_id: str):
                 recording['motion_events'] += 1
             
             # Encode frame for WebSocket (lower quality for streaming)
+            # Resize to reduce bandwidth
             small_frame = cv2.resize(frame, (640, 360))
-            _, buffer = await asyncio.to_thread(cv2.imencode, '.jpg', small_frame, [cv2.IMWRITE_JPEG_QUALITY, 60])
+            
+            # Encode to JPEG with quality 70 for better compatibility
+            encode_success, buffer = await asyncio.to_thread(
+                cv2.imencode, '.jpg', small_frame, 
+                [cv2.IMWRITE_JPEG_QUALITY, 70]
+            )
+            
+            if not encode_success or buffer is None:
+                logger.warning(f"Failed to encode frame for camera {camera_id}")
+                await asyncio.sleep(0.1)
+                continue
             
             # Broadcast to WebSocket clients
             await ws_manager.broadcast(camera_id, buffer.tobytes())
@@ -355,9 +386,17 @@ async def process_camera_stream(camera_id: str):
             await asyncio.sleep(0.03)  # ~30fps for live stream
             
         except asyncio.CancelledError:
+            logger.info(f"Stream processing cancelled for camera {camera_id}")
             break
         except Exception as e:
-            logger.error(f"Error processing camera {camera_id}: {e}")
+            logger.error(f"Error processing camera {camera_id}: {e}", exc_info=True)
+            consecutive_failures += 1
+            
+            if consecutive_failures >= max_failures:
+                logger.error(f"Too many errors for camera {camera_id}, stopping stream")
+                await camera_manager.disconnect_camera(camera_id)
+                break
+            
             await asyncio.sleep(1)
 
 # API Routes
