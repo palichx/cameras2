@@ -149,17 +149,10 @@ export default function CameraView() {
             data-testid="back-to-dashboard-btn"
           >
             <ArrowLeft className="mr-2 h-5 w-5" />
-            Back to Dashboard
+            Назад к камерам
           </Button>
 
           <div className="flex gap-3">
-            <Button
-              onClick={() => setShowZoneEditor(!showZoneEditor)}
-              className="bg-white/20 hover:bg-white/30 text-white border border-white/30"
-              data-testid="toggle-zone-editor-btn"
-            >
-              {showZoneEditor ? 'Hide' : 'Edit'} Exclusion Zones
-            </Button>
             <Button
               onClick={toggleRecording}
               className={`${isRecording ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'} text-white font-semibold`}
@@ -168,10 +161,10 @@ export default function CameraView() {
               {isRecording ? (
                 <>
                   <Square className="mr-2 h-5 w-5" />
-                  Stop Recording
+                  Остановить запись
                 </>
               ) : (
-                'Start Recording'
+                'Начать запись вручную'
               )}
             </Button>
           </div>
