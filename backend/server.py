@@ -541,12 +541,14 @@ if STATIC_DIR.exists():
 else:
     logger.warning(f"Frontend build directory not found at {STATIC_DIR}")
 
+# CORS middleware - разрешаем все источники для локальной сети
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=["*"],  # Разрешаем любые источники для локальной работы
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 @app.on_event("shutdown")
