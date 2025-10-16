@@ -208,17 +208,17 @@ export default function CameraView() {
           <div>
             <Card className="glass border-white/20" data-testid="camera-info-card">
               <CardHeader>
-                <CardTitle className="text-white text-xl">Camera Information</CardTitle>
+                <CardTitle className="text-white text-xl">Информация о камере</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-white/80">
                 <div>
-                  <p className="text-white/50 text-sm">Status</p>
+                  <p className="text-white/50 text-sm">Статус</p>
                   <p className="font-semibold capitalize" data-testid="camera-info-status">{camera.status}</p>
                 </div>
                 {camera.resolution && (
                   <>
                     <div>
-                      <p className="text-white/50 text-sm">Resolution</p>
+                      <p className="text-white/50 text-sm">Разрешение</p>
                       <p className="font-semibold" data-testid="camera-info-resolution">{camera.resolution}</p>
                     </div>
                     <div>
@@ -226,19 +226,25 @@ export default function CameraView() {
                       <p className="font-semibold" data-testid="camera-info-fps">{camera.fps?.toFixed(1)}</p>
                     </div>
                     <div>
-                      <p className="text-white/50 text-sm">Codec</p>
+                      <p className="text-white/50 text-sm">Кодек</p>
                       <p className="font-semibold" data-testid="camera-info-codec">{camera.codec}</p>
                     </div>
                     <div>
-                      <p className="text-white/50 text-sm">Bitrate</p>
+                      <p className="text-white/50 text-sm">Битрейт</p>
                       <p className="font-semibold" data-testid="camera-info-bitrate">{camera.bitrate}</p>
                     </div>
                   </>
                 )}
                 <div>
-                  <p className="text-white/50 text-sm">Exclusion Zones</p>
+                  <p className="text-white/50 text-sm">Зоны исключения</p>
                   <p className="font-semibold" data-testid="exclusion-zones-count">
-                    {camera.exclusion_zones?.length || 0} zones
+                    {camera.exclusion_zones?.length || 0} зон
+                  </p>
+                </div>
+                <div>
+                  <p className="text-white/50 text-sm">Запись по движению</p>
+                  <p className="font-semibold" data-testid="motion-recording-status">
+                    {camera.motion_settings?.enabled ? 'Вкл' : 'Выкл'}
                   </p>
                 </div>
               </CardContent>
@@ -246,16 +252,46 @@ export default function CameraView() {
           </div>
         </div>
 
-        {/* Zone Editor */}
-        {showZoneEditor && (
-          <div className="mt-6">
-            <ZoneEditor
-              cameraId={id}
-              initialZones={camera.exclusion_zones || []}
-              onSave={handleZonesSaved}
-            />
-          </div>
-        )}
+        {/* Settings Tabs */}
+        <div className="mt-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 bg-white/10">
+              <TabsTrigger value="live" className="data-[state=active]:bg-white/20">
+                Live Preview
+              </TabsTrigger>
+              <TabsTrigger value="zones" className="data-[state=active]:bg-white/20">
+                Зоны исключения
+              </TabsTrigger>
+              <TabsTrigger value="motion" className="data-[state=active]:bg-white/20">
+                Детектор движения
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="live" className="mt-4">
+              <Card className="glass border-white/20">
+                <CardContent className="pt-6">
+                  <p className="text-white/70">Используйте live preview выше для просмотра камеры в реальном времени</p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="zones" className="mt-4">
+              <ZoneEditor
+                cameraId={id}
+                initialZones={camera.exclusion_zones || []}
+                onSave={handleSettingsSaved}
+              />
+            </TabsContent>
+            
+            <TabsContent value="motion" className="mt-4">
+              <MotionSettings
+                cameraId={id}
+                initialSettings={camera.motion_settings}
+                onSave={handleSettingsSaved}
+              />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   );
