@@ -117,9 +117,8 @@ export default function CameraView() {
     }
   };
 
-  const handleZonesSaved = async () => {
-    setShowZoneEditor(false);
-    toast.success('Exclusion zones saved');
+  const handleSettingsSaved = async () => {
+    toast.success('Настройки сохранены');
     fetchCamera();
   };
 
