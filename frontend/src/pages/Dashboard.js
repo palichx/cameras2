@@ -59,10 +59,11 @@ export default function Dashboard() {
     try {
       await axios.post(`${API}/cameras/${cameraId}/record/start`);
       toast.success('Recording started');
-      fetchCameras();
     } catch (error) {
       console.error('Error starting recording:', error);
       toast.error('Failed to start recording');
+    } finally {
+      fetchCameras();
     }
   };
 
