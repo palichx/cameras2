@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # MongoDB database
+  mongo:
+    image: mongo:7.0
+    container_name: surveillance-mongo
+    restart: always
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - surveillance-net
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend + Frontend
+  app:
+    build: .
+    container_name: surveillance-app
+    restart: always
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./recordings:/app/backend/recordings
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+      - DB_NAME=surveillance_db
+      - CORS_ORIGINS=*
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - surveillance-net
+
+volumes:
+  mongo_data:
+    driver: local
+
+networks:
+  surveillance-net:
+    driver: bridge
