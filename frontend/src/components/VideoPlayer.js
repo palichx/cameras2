@@ -2,8 +2,9 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Slider } from './ui/slider';
 import { Play, Pause } from 'lucide-react';
+import { getBackendUrl } from '../utils/api';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = getBackendUrl();
 const API = `${BACKEND_URL}/api`;
 
 export default function VideoPlayer({ recordingId }) {
