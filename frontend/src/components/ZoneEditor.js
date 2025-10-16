@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Trash2 } from 'lucide-react';
+import { Trash2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { getBackendUrl } from '../utils/api';
 
@@ -14,18 +14,60 @@ export default function ZoneEditor({ cameraId, initialZones, onSave }) {
   const [currentZone, setCurrentZone] = useState([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const canvasRef = useRef(null);
-  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 450 });
+  const [snapshot, setSnapshot] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const imageRef = useRef(null);
 
   useEffect(() => {
-    drawZones();
-  }, [zones, currentZone]);
+    loadSnapshot();
+  }, [cameraId]);
+
+  useEffect(() => {
+    if (snapshot) {
+      drawZones();
+    }
+  }, [zones, currentZone, snapshot]);
+
+  const loadSnapshot = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API}/cameras/${cameraId}/snapshot`, {
+        responseType: 'blob'
+      });
+      const imageUrl = URL.createObjectURL(response.data);
+      setSnapshot(imageUrl);
+      
+      // Load image to get dimensions
+      const img = new Image();
+      img.onload = () => {
+        const canvas = canvasRef.current;
+        if (canvas) {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          drawZones();
+        }
+      };
+      img.src = imageUrl;
+      imageRef.current = img;
+      
+    } catch (error) {
+      console.error('Error loading snapshot:', error);
+      toast.error('Не удалось загрузить изображение с камеры. Убедитесь что камера активна.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const drawZones = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !imageRef.current) return;
 
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw camera image
+    if (snapshot && imageRef.current.complete) {
+      ctx.drawImage(imageRef.current, 0, 0);
+    }
 
     // Draw existing zones
     zones.forEach((zone, index) => {
@@ -49,6 +91,13 @@ export default function ZoneEditor({ cameraId, initialZones, onSave }) {
           ctx.fillStyle = 'red';
           ctx.fill();
         });
+        
+        // Draw zone number
+        const centerX = zone.points.reduce((sum, p) => sum + p[0], 0) / zone.points.length;
+        const centerY = zone.points.reduce((sum, p) => sum + p[1], 0) / zone.points.length;
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.fillText(`Зона ${index + 1}`, centerX - 25, centerY);
       }
     });
 
@@ -93,9 +142,9 @@ export default function ZoneEditor({ cameraId, initialZones, onSave }) {
       setZones([...zones, { points: currentZone }]);
       setCurrentZone([]);
       setIsDrawing(false);
-      toast.success('Zone added');
+      toast.success('Зона добавлена');
     } else {
-      toast.error('Zone must have at least 3 points');
+      toast.error('Зона должна иметь минимум 3 точки');
     }
   };
 
@@ -106,7 +155,7 @@ export default function ZoneEditor({ cameraId, initialZones, onSave }) {
 
   const deleteZone = (index) => {
     setZones(zones.filter((_, i) => i !== index));
-    toast.success('Zone deleted');
+    toast.success('Зона удалена');
   };
 
   const saveZones = async () => {
@@ -117,39 +166,65 @@ export default function ZoneEditor({ cameraId, initialZones, onSave }) {
       onSave();
     } catch (error) {
       console.error('Error saving zones:', error);
-      toast.error('Failed to save zones');
+      toast.error('Ошибка сохранения зон');
     }
   };
 
   return (
     <Card className="glass border-white/20" data-testid="zone-editor-card">
       <CardHeader>
-        <CardTitle className="text-white text-2xl">Exclusion Zones Editor</CardTitle>
+        <CardTitle className="text-white text-2xl">Редактор зон исключения</CardTitle>
         <p className="text-white/70 text-sm mt-2">
-          Click on the canvas to draw exclusion zones where motion detection will be disabled
+          Нарисуйте зоны, где детектор движения будет отключен (деревья, дороги, флаги и т.д.)
         </p>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <div className="relative bg-gray-900 rounded-lg overflow-hidden" data-testid="zone-canvas-container">
-            <canvas
-              ref={canvasRef}
-              width={canvasSize.width}
-              height={canvasSize.height}
-              onClick={handleCanvasClick}
-              className="w-full cursor-crosshair"
-              data-testid="zone-canvas"
-            />
-          </div>
+          {/* Snapshot loading */}
+          {loading && (
+            <div className="text-white text-center py-8">Загрузка изображения...</div>
+          )}
+          
+          {!loading && !snapshot && (
+            <div className="text-white/70 text-center py-8">
+              <p>Не удалось загрузить изображение</p>
+              <Button onClick={loadSnapshot} className="mt-4">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Повторить
+              </Button>
+            </div>
+          )}
+
+          {snapshot && (
+            <div className="relative bg-gray-900 rounded-lg overflow-hidden" data-testid="zone-canvas-container">
+              <canvas
+                ref={canvasRef}
+                onClick={handleCanvasClick}
+                className="w-full cursor-crosshair"
+                data-testid="zone-canvas"
+              />
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={loadSnapshot}
+              variant="outline"
+              className="border-white/30 text-white hover:bg-white/10"
+              data-testid="refresh-snapshot-btn"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Обновить изображение
+            </Button>
+            
             {!isDrawing ? (
               <Button
                 onClick={startDrawing}
                 className="bg-green-500 hover:bg-green-600 text-white"
                 data-testid="start-drawing-btn"
+                disabled={!snapshot}
               >
-                Start Drawing Zone
+                Начать рисование зоны
               </Button>
             ) : (
               <>
@@ -158,7 +233,7 @@ export default function ZoneEditor({ cameraId, initialZones, onSave }) {
                   className="bg-blue-500 hover:bg-blue-600 text-white"
                   data-testid="finish-zone-btn"
                 >
-                  Finish Zone ({currentZone.length} points)
+                  Завершить зону ({currentZone.length} точек)
                 </Button>
                 <Button
                   onClick={cancelDrawing}
@@ -166,7 +241,7 @@ export default function ZoneEditor({ cameraId, initialZones, onSave }) {
                   className="border-white/30 text-white hover:bg-white/10"
                   data-testid="cancel-zone-btn"
                 >
-                  Cancel
+                  Отмена
                 </Button>
               </>
             )}
@@ -177,14 +252,14 @@ export default function ZoneEditor({ cameraId, initialZones, onSave }) {
                 className="bg-white text-purple-600 hover:bg-white/90 font-semibold"
                 data-testid="save-zones-btn"
               >
-                Save Zones
+                Сохранить зоны
               </Button>
             )}
           </div>
 
           {zones.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-white font-semibold">Active Zones ({zones.length})</h3>
+              <h3 className="text-white font-semibold">Активные зоны ({zones.length})</h3>
               <div className="space-y-2">
                 {zones.map((zone, index) => (
                   <div
@@ -193,7 +268,7 @@ export default function ZoneEditor({ cameraId, initialZones, onSave }) {
                     data-testid={`zone-item-${index}`}
                   >
                     <span className="text-white">
-                      Zone {index + 1} ({zone.points?.length || 0} points)
+                      Зона {index + 1} ({zone.points?.length || 0} точек)
                     </span>
                     <Button
                       onClick={() => deleteZone(index)}
