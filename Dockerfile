@@ -49,7 +49,6 @@ EXPOSE 8001 3000
 # Environment variables
 ENV MONGO_URL="mongodb://mongo:27017"
 ENV DB_NAME="surveillance_db"
-ENV CORS_ORIGINS="*"
 ENV PYTHONUNBUFFERED=1
 
 # Start backend server
