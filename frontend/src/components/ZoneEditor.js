@@ -4,8 +4,9 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getBackendUrl } from '../utils/api';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = getBackendUrl();
 const API = `${BACKEND_URL}/api`;
 
 export default function ZoneEditor({ cameraId, initialZones, onSave }) {
