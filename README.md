@@ -44,20 +44,27 @@ git clone <repository-url>
 cd <repository-name>
 ```
 
-2. Запустите приложение:
+2. Проверьте наличие всех файлов (опционально):
 ```bash
-docker-compose up -d
+./scripts/check-repo.sh
 ```
 
-3. Откройте браузер:
+3. Запустите приложение:
+```bash
+docker-compose up --build -d
+```
+
+4. Откройте браузер:
 ```
 http://localhost:8001
 ```
 
-4. Остановка:
+5. Остановка:
 ```bash
 docker-compose down
 ```
+
+**Примечание**: Убедитесь, что `frontend/yarn.lock` присутствует в репозитории для воспроизводимых сборок. См. `GIT_SETUP.md` для деталей.
 
 ### Локальный запуск (для разработки)
 
