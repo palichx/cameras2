@@ -527,6 +527,37 @@ async def update_camera(camera_id: str, update: CameraUpdate):
         updated_camera['created_at'] = datetime.fromisoformat(updated_camera['created_at'])
     return updated_camera
 
+@api_router.get("/cameras/{camera_id}/snapshot")
+async def get_camera_snapshot(camera_id: str):
+    """Получить текущий кадр с камеры для редактора зон"""
+    if not camera_manager.is_connected(camera_id):
+        raise HTTPException(status_code=400, detail="Camera is not active")
+    
+    try:
+        cam_data = camera_manager.active_cameras[camera_id]
+        cap = cam_data['cap']
+        
+        # Read current frame
+        ret, frame = await asyncio.to_thread(cap.read)
+        
+        if not ret or frame is None:
+            raise HTTPException(status_code=500, detail="Failed to capture frame")
+        
+        # Encode to JPEG
+        _, buffer = await asyncio.to_thread(
+            cv2.imencode, '.jpg', frame, 
+            [cv2.IMWRITE_JPEG_QUALITY, 85]
+        )
+        
+        return StreamingResponse(
+            iter([buffer.tobytes()]),
+            media_type="image/jpeg"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting snapshot from camera {camera_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.delete("/cameras/{camera_id}")
 async def delete_camera(camera_id: str):
     await camera_manager.disconnect_camera(camera_id)
