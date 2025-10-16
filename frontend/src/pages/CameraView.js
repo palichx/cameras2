@@ -248,14 +248,14 @@ export default function CameraView() {
         {/* Settings Tabs */}
         <div className="mt-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-white/10">
-              <TabsTrigger value="live" className="data-[state=active]:bg-white/20">
+            <TabsList className="grid w-full grid-cols-3 bg-white/10">
+              <TabsTrigger value="live" className="data-[state=active]:bg-white/20 text-white">
                 Live Preview
               </TabsTrigger>
-              <TabsTrigger value="zones" className="data-[state=active]:bg-white/20">
+              <TabsTrigger value="zones" className="data-[state=active]:bg-white/20 text-white">
                 Зоны исключения
               </TabsTrigger>
-              <TabsTrigger value="motion" className="data-[state=active]:bg-white/20">
+              <TabsTrigger value="motion" className="data-[state=active]:bg-white/20 text-white">
                 Детектор движения
               </TabsTrigger>
             </TabsList>
