@@ -68,9 +68,11 @@ cd <repo-name>
 # Убедиться что yarn.lock присутствует
 ls -la frontend/yarn.lock
 
-# Сборка и запуск
+# Сборка и запуск (Node.js 20 используется автоматически в Docker)
 docker-compose up --build -d
 ```
+
+**Примечание**: Dockerfile использует Node.js 20, которая требуется для React Router DOM 7.9+
 
 ## Решение проблем
 
