@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { ArrowLeft, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import ZoneEditor from '../components/ZoneEditor';
+import { getBackendUrl, getWebSocketUrl } from '../utils/api';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = getBackendUrl();
 const API = `${BACKEND_URL}/api`;
-const WS_URL = BACKEND_URL.replace('https://', 'wss://').replace('http://', 'ws://');
+const WS_URL = getWebSocketUrl();
 
 export default function CameraView() {
   const { id } = useParams();
