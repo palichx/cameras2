@@ -1,7 +1,7 @@
 # Multi-stage Dockerfile for Video Surveillance System
 
 # Stage 1: Build frontend
-FROM node:18-alpine AS frontend-builder
+FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
