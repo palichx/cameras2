@@ -85,10 +85,11 @@ export default function Dashboard() {
     try {
       await axios.delete(`${API}/cameras/${cameraId}`);
       toast.success('Camera deleted');
-      fetchCameras();
     } catch (error) {
       console.error('Error deleting camera:', error);
       toast.error('Failed to delete camera');
+    } finally {
+      fetchCameras();
     }
   };
 
