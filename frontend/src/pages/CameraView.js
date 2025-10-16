@@ -22,7 +22,7 @@ export default function CameraView() {
   const canvasRef = useRef(null);
   const wsRef = useRef(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [showZoneEditor, setShowZoneEditor] = useState(false);
+  const [activeTab, setActiveTab] = useState('live');
 
   useEffect(() => {
     fetchCamera();
