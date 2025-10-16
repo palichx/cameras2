@@ -316,6 +316,10 @@ ws_manager = ConnectionManager()
 async def process_camera_stream(camera_id: str):
     consecutive_failures = 0
     max_failures = 10
+    frame_counter = 0
+    motion_buffer = []  # Буфер для предзаписи
+    motion_detected_time = None
+    is_recording = False
     
     while camera_id in camera_manager.active_cameras:
         try:
@@ -324,6 +328,24 @@ async def process_camera_stream(camera_id: str):
             mog2 = cam_data['mog2']
             recording = cam_data['recording']
             codec = cam_data.get('codec', 'unknown')
+            
+            # Получаем настройки камеры
+            camera_doc = await db.cameras.find_one(
+                {"id": camera_id}, 
+                {"motion_settings": 1, "exclusion_zones": 1, "fps": 1}
+            )
+            
+            motion_settings = camera_doc.get('motion_settings', {}) if camera_doc else {}
+            motion_enabled = motion_settings.get('enabled', True)
+            sensitivity = motion_settings.get('sensitivity', 25)
+            min_area = motion_settings.get('min_area', 500)
+            pre_record_sec = motion_settings.get('pre_record', 5)
+            post_record_sec = motion_settings.get('post_record', 10)
+            exclusion_zones = camera_doc.get('exclusion_zones', []) if camera_doc else []
+            camera_fps = camera_doc.get('fps', 25.0) if camera_doc else 25.0
+            
+            # Расчет размера буфера предзаписи
+            buffer_size = int(camera_fps * pre_record_sec)
             
             # Read frame
             ret, frame = await asyncio.to_thread(cap.read)
@@ -342,6 +364,7 @@ async def process_camera_stream(camera_id: str):
             
             # Reset failure counter on successful read
             consecutive_failures = 0
+            frame_counter += 1
             
             # Verify frame is not empty
             if frame.size == 0:
@@ -349,50 +372,95 @@ async def process_camera_stream(camera_id: str):
                 await asyncio.sleep(0.1)
                 continue
             
+            # Оптимизация: обрабатываем MOG2 только каждый 3-й кадр для снижения CPU
+            process_motion = (frame_counter % 3 == 0) and motion_enabled
+            motion_detected = False
+            
+            if process_motion:
+                # Уменьшаем кадр для MOG2 (снижение CPU)
+                small_frame_mog = cv2.resize(frame, (320, 180))
+                
+                # Apply MOG2 с настройками чувствительности
+                fg_mask = await asyncio.to_thread(
+                    mog2.apply, small_frame_mog, 
+                    learningRate=sensitivity / 1000.0
+                )
+                
+                # Apply exclusion zones
+                if exclusion_zones:
+                    mask = np.ones(fg_mask.shape, dtype=np.uint8) * 255
+                    for zone in exclusion_zones:
+                        if zone.get('points'):
+                            # Масштабируем координаты зон под размер small_frame
+                            scale_x = 320 / frame.shape[1]
+                            scale_y = 180 / frame.shape[0]
+                            pts = np.array([
+                                [int(p[0] * scale_x), int(p[1] * scale_y)] 
+                                for p in zone['points']
+                            ], dtype=np.int32)
+                            cv2.fillPoly(mask, [pts], 0)
+                    fg_mask = cv2.bitwise_and(fg_mask, mask)
+                
+                # Detect motion
+                motion_pixels = cv2.countNonZero(fg_mask)
+                if motion_pixels > (min_area / 10):  # Скейлинг для уменьшенного кадра
+                    motion_detected = True
+                    motion_detected_time = datetime.now(timezone.utc)
+            
+            # Управление буфером предзаписи
+            if motion_enabled:
+                motion_buffer.append(frame.copy())
+                if len(motion_buffer) > buffer_size:
+                    motion_buffer.pop(0)
+            
+            # Автоматическая запись при движении
+            if motion_enabled and not recording:
+                if motion_detected:
+                    # Начать запись с предзаписью
+                    recording_id = await camera_manager.start_recording(camera_id, camera_doc.get('name', 'Camera'))
+                    if recording_id:
+                        recording = camera_manager.active_cameras[camera_id]['recording']
+                        # Записываем буфер предзаписи
+                        for buffered_frame in motion_buffer:
+                            if recording and recording['writer']:
+                                await asyncio.to_thread(recording['writer'].write, buffered_frame)
+                        is_recording = True
+                        logger.info(f"Motion detected on camera {camera_id}, started recording with {len(motion_buffer)} pre-record frames")
+            
+            # Остановка записи если нет движения долгое время
+            if recording and motion_enabled and motion_detected_time:
+                time_since_motion = (datetime.now(timezone.utc) - motion_detected_time).total_seconds()
+                if time_since_motion > post_record_sec:
+                    await camera_manager.stop_recording(camera_id)
+                    recording = None
+                    is_recording = False
+                    motion_detected_time = None
+                    logger.info(f"No motion for {post_record_sec}s on camera {camera_id}, stopped recording")
+            
             # Write to recording if active
             if recording and recording['writer']:
                 await asyncio.to_thread(recording['writer'].write, frame)
+                if motion_detected:
+                    recording['motion_events'] += 1
             
-            # Motion detection with exclusion zones
-            camera_doc = await db.cameras.find_one({"id": camera_id}, {"exclusion_zones": 1})
-            exclusion_zones = camera_doc.get('exclusion_zones', []) if camera_doc else []
+            # Encode frame for WebSocket - только каждый 2-й кадр для снижения CPU
+            if frame_counter % 2 == 0:
+                # Resize для streaming (снижение CPU и bandwidth)
+                small_frame = cv2.resize(frame, (640, 360))
+                
+                # Encode to JPEG with quality 60 для снижения CPU
+                encode_success, buffer = await asyncio.to_thread(
+                    cv2.imencode, '.jpg', small_frame, 
+                    [cv2.IMWRITE_JPEG_QUALITY, 60]
+                )
+                
+                if encode_success and buffer is not None:
+                    # Broadcast to WebSocket clients
+                    await ws_manager.broadcast(camera_id, buffer.tobytes())
             
-            # Apply MOG2
-            fg_mask = await asyncio.to_thread(mog2.apply, frame)
-            
-            # Apply exclusion zones
-            if exclusion_zones:
-                mask = np.ones(fg_mask.shape, dtype=np.uint8) * 255
-                for zone in exclusion_zones:
-                    if zone.get('points'):
-                        pts = np.array(zone['points'], dtype=np.int32)
-                        cv2.fillPoly(mask, [pts], 0)
-                fg_mask = cv2.bitwise_and(fg_mask, mask)
-            
-            # Detect motion
-            motion_pixels = cv2.countNonZero(fg_mask)
-            if motion_pixels > 1000 and recording:  # Threshold for motion
-                recording['motion_events'] += 1
-            
-            # Encode frame for WebSocket (lower quality for streaming)
-            # Resize to reduce bandwidth
-            small_frame = cv2.resize(frame, (640, 360))
-            
-            # Encode to JPEG with quality 70 for better compatibility
-            encode_success, buffer = await asyncio.to_thread(
-                cv2.imencode, '.jpg', small_frame, 
-                [cv2.IMWRITE_JPEG_QUALITY, 70]
-            )
-            
-            if not encode_success or buffer is None:
-                logger.warning(f"Failed to encode frame for camera {camera_id}")
-                await asyncio.sleep(0.1)
-                continue
-            
-            # Broadcast to WebSocket clients
-            await ws_manager.broadcast(camera_id, buffer.tobytes())
-            
-            await asyncio.sleep(0.03)  # ~30fps for live stream
+            # Динамическая задержка в зависимости от FPS камеры
+            delay = max(0.05, 1.0 / camera_fps) if camera_fps > 0 else 0.05
+            await asyncio.sleep(delay)
             
         except asyncio.CancelledError:
             logger.info(f"Stream processing cancelled for camera {camera_id}")
