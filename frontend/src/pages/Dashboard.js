@@ -47,10 +47,11 @@ export default function Dashboard() {
     try {
       await axios.post(`${API}/cameras/${cameraId}/stop`);
       toast.success('Camera stopped');
-      fetchCameras();
     } catch (error) {
       console.error('Error stopping camera:', error);
       toast.error('Failed to stop camera');
+    } finally {
+      fetchCameras();
     }
   };
 
