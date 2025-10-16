@@ -100,14 +100,32 @@ class CameraManager:
             cap = await asyncio.to_thread(cv2.VideoCapture, url)
             
             if not cap.isOpened():
-                logger.error(f"Failed to open camera {camera.id}")
+                logger.error(f"Failed to open camera {camera.id}: VideoCapture could not open stream")
                 return False
+            
+            # Try to read a test frame to verify stream works
+            ret, test_frame = await asyncio.to_thread(cap.read)
+            if not ret or test_frame is None:
+                logger.error(f"Failed to read test frame from camera {camera.id}")
+                cap.release()
+                return False
+            
+            logger.info(f"Successfully read test frame from camera {camera.id}: shape={test_frame.shape}")
             
             # Get camera properties
             codec = int(cap.get(cv2.CAP_PROP_FOURCC))
-            codec_str = "".join([chr((codec >> 8 * i) & 0xFF) for i in range(4)])
+            codec_str = "".join([chr((codec >> 8 * i) & 0xFF) for i in range(4)]).strip()
+            if not codec_str:
+                codec_str = "unknown"
+            
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            
+            # Fallback to actual frame dimensions if properties not available
+            if width == 0 or height == 0:
+                height, width = test_frame.shape[:2]
+                logger.info(f"Using frame dimensions: {width}x{height}")
+            
             fps = cap.get(cv2.CAP_PROP_FPS)
             bitrate = cap.get(cv2.CAP_PROP_BITRATE)
             
@@ -131,14 +149,15 @@ class CameraManager:
                 'mog2': mog2,
                 'recording': None,
                 'task': None,
-                'url': url
+                'url': url,
+                'codec': codec_str
             }
             
             logger.info(f"Camera {camera.id} connected: {width}x{height} @ {fps}fps, codec: {codec_str}")
             return True
             
         except Exception as e:
-            logger.error(f"Error connecting to camera {camera.id}: {e}")
+            logger.error(f"Error connecting to camera {camera.id}: {e}", exc_info=True)
             await db.cameras.update_one({"id": camera.id}, {"$set": {"status": "error"}})
             return False
     
